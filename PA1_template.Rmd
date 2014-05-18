@@ -1,20 +1,207 @@
-# Reproducible Research: Peer Assessment 1
+Reproducible Research: Project 1
+========================================================
+
+### Load and Preprocess Data
+
+We will read the ctivity csv file "as is", convert the date to date objects, and just to be safe make sure the steps and intervals are interpreted as numbers.
+
+```{r}
+activity<-read.csv("activity.csv", header=TRUE,as.is=TRUE)
+activity$date<-as.Date(activity$date)
+activity$steps<-as.numeric(activity$steps)
+activity$interval<-as.numeric(activity$interval)
+```
+
+### Mean and Total Number of Steps per Day
+
+Let's get rid of the NA's
+
+```{r}
+activityCleaned<-na.omit(activity)
+```
+
+Since we are going to compute a histogram of the number of steps per day and then figure out the mean number of steps per day, let's make the dates factors
+
+```{r}
+activityCleaned$date<-factor(activityCleaned$date)
+```
+
+Now, lets sum on the total number of steps per day
+
+```{r}
+steps_per_day<-tapply(activityCleaned$steps,activityCleaned$date,sum)
+```
+ and make a histogram
+ 
+```{r} 
+png(filename="fig1.png", width=480, height=480, units="px")
+ hist(steps_per_day,col="red",main="Histogram of Steps per Day",xlab="Steps per day",ylim=c(0,30))
+dev.off()
+```
+The mean amd median number of steps per day are `r mean(steps_per_day)` and `r median(steps_per_day)`, respectively.
 
 
-## Loading and preprocessing the data
+### Average Daily Activity Pattern
+
+Once again, let's get rid of the NAs:
+
+```{r}
+activityCleaned<-na.omit(activity)
+```
+
+Since we are determining the mean number of steps over 5 minute intervals, lets make the interval a factor:
+
+```{r}
+activityCleaned$interval<-factor(activityCleaned$interval)
+```
+
+Now, let's compute the average over each interval:
+
+```{r}
+mean_steps_per_interval<-tapply(activityCleaned$steps,activityCleaned$interval,mean)
+```
+
+and plot the averages over the 5 minute intrvals:
+
+```{r}
+png(filename="fig2.png", width=480, height=480, units="px")
+plot(mean_steps_per_interval,type="l",xlab="5 Minute Intervals",ylab="Mean Number of Steps",main="Mean Numbers of Steps Averaged Over 5-Minute Intervals",xaxt="n") 
+axis(1,at=c(1,50,100,150,200,250,288,300))
+dev.off()
+```
+
+Note that in this plot, the numbers along the horizontal axis - 1, 50, 100 - refer to the 1st, 50th, 100th - 5 minute interval.  These are not the numbers from the interval columns activity.csv file. Below I discuss the interval numbers in the activity.csv file, but for now observe a good check is to observe that 288, the maximum 5 minute interval,times 5 equals 1440, the number of minutes in 24 hours which is exactly what one would expect.
+
+The maximum number of steps number of steps in each 5 minute interval is the maximum value of the mean_steps_per_interval array:
+
+```{r}
+max(as.numeric(mean_steps_per_interval))
+```
+
+This maximum is `r max(as.numeric(mean_steps_per_interval))`.
+
+To figure out which interval this maximum corresponds to we use which.max:
+
+```{r}
+which.max(as.numeric(mean_steps_per_interval))
+```
+
+The interval corresponding to the maximum is `r which.max(as.numeric(mean_steps_per_interval))`.
+
+To determine which interval this corresponds to in the activity.csv file:
+
+```{r}
+activity$interval[which.max(as.numeric(mean_steps_per_interval))]
+```
+The interval is `r activity$interval[which.max(as.numeric(mean_steps_per_interval))]`.
+
+The last two digits of this number corresponds to the minute and the first number corresponds to the hour.  In other words, the maximum number of steps occurs at 8:35.
+
+### Estimating Missing Values
+
+Let's make an array with the column names,
+
+```{r}
+colNames<-c(colnames(activity[1]),colnames(activity[2]),colnames(activity[3]))
+
+```
+
+count the NAs and sum them.  Further, as one can see below, all the NAs are in the steps column.
+
+```{r}
+colNAs<-sapply(colNames, function(x) {sum(is.na(activity[, x]))})
+sum(colNAs)
+colNAs
+```
 
 
+The NAs in the steps column will be replaced by  the values mean_steps_per_interval array.  First, let's make a new activity array
 
-## What is mean total number of steps taken per day?
+```{r}
+activityNoNAs<-activity
+```
+Next, we'll create a logical vector to replace the NAs and use it to replace the NAs
+
+```{r}
+L<-is.na(activity$step)
+activityNoNAs$steps[L]<-mean_steps_per_interval
+```
+Finally, we'll re-do the first part of the assignment to see if the histogram, mean and median values change.
 
 
+```{r}
+png(filename="fig3.png", width=480, height=480, units="px")
+activityNoNAs$date<-factor(activityNoNAs$date)
+steps_per_day<-tapply(activityNoNAs$steps,activityNoNAs$date,sum)
+hist(steps_per_day,col="red",main="Histogram of Steps per Day",xlab="Steps per day",ylim=c(0,30))
+dev.off()
+```
 
-## What is the average daily activity pattern?
+Naturally, since we have included more steps where previously there were none (NAs) there are now more steps per day and each box of the histogram is higher.
+
+The mean number of steps per day is `r mean(steps_per_day)` which is the same as we computed before. This makes sense since we simply replaced the NAs with the mean number of steps for each day which will not change the overall average.  The median,`r median(steps_per_day)`, naturally remains unchanged.
+
+### Activity Patterns for Weekdays verus Weekends
+
+Let's add a new column, day, to the activityNoNAs data frame corresponding to a weekday/weekend factor variable. First, we need to make the date column a Date R variable:
+
+```{r}
+activityNoNAs$date<-as.Date(activityNoNAs$date)
+```
+
+Next, we'll make the date column default to a weekday
+
+```{r}
+activityNoNAs$day<-"weekday"
+```
+and then set it to a weekend if the day is Saturday or Sunday
+
+```{r}
+for (i in (1:length(activityNoNAs$date))) {
+  if (identical(weekdays(activityNoNAs$date[i]),"Saturday")){ 
+   activityNoNAs$day[i]="weekend"
+  }
+}
+for (i in (1:length(activityNoNAs$date))) {
+  if (identical(weekdays(activityNoNAs$date[i]),"Sunday")){
+    activityNoNAs$day[i]="weekend"
+  }
+}
+```
+
+Finally, we make the day and interval columns factors and then compute separate averages for both the weekend and weekday
+
+```{r}
+activityNoNAs$day<-factor(activityNoNAs$day)
+activityNoNAs$interval<-factor(activityNoNAs$interval)
+mean_steps_per_interval<-tapply(activityNoNAs$steps,list(activityNoNAs$interval,activityNoNAs$day),mean)
+```
+Now we are ready to make the plots.  Below I do this in the base plotting system.
+
+```{r}
+png(filename="fig4.png", width=480, height=480, units="px")
+par(mfrow=c(2,1))
+plot(mean_steps_per_interval[,1],type="l",xlab="5 Minute Intervals",ylab="Mean Number of Steps",main="Mean Numbers of Steps Averaged Over 5-Minute Intervals for weekend.",xaxt="n") 
+axis(1,at=c(1,50,100,150,200,250,288,300))
+plot(mean_steps_per_interval[,2],type="l",xlab="5 Minute Intervals",ylab="Mean Number of Steps",main="Mean Numbers of Steps Averaged Over 5-Minute Intervals for weekday.",xaxt="n") 
+axis(1,at=c(1,50,100,150,200,250,288,300))
+dev.off()
+```
+Well, these plots don't look like the plots in the project description.  It didn't occur to me until I saw the lecture on the Lattice plotting system that we were supposed to do that.  So here it goes...
+
+```{r}
+library(lattice)
+Steps<-mean_steps_per_interval[,1]
+Steps<-append(Steps,mean_steps_per_interval[,2])
+Interval<-c(1:288)
+Days<-c()
+for (i in (1:288)){Days<-append(Days,"weekday")}
+for (i in (1:288)){Days<-append(Days,"weekend")}
+df<-data.frame(Interval,Steps,Days)
+trellis.device(device="png", filename="fig5.png")
+p<-xyplot(df$Steps ~ df$Interval | df$Days, type="l", ,xlab="intervals",ylab=("Number of Steps"),layout=c(1,2))
+print(p)
+dev.off()
+```
 
 
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
